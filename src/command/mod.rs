@@ -2,6 +2,7 @@ use clap::ArgMatches;
 use std::io::{stdin,stdout,Write};
 use serde_json::{Value};
 use std::fs::File;
+use std::io::prelude::*;
 use std::fs::{DirBuilder};
 
 extern crate dirs;
@@ -69,6 +70,60 @@ pub async fn login(args: &ArgMatches, matches: &ArgMatches) -> Result<(), Box<dy
     println!("");
 
     Ok(())     
+}
+
+/**
+ * List products command.
+ */
+#[tokio::main]
+pub async fn products(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+
+    // Get config path
+    let home_directory = dirs::config_dir().expect("Failed to get home directory.");
+    let auth_path = format!("{}/tesla-client/auth.json", home_directory.display());
+
+    // Read file
+    let mut file = File::open(auth_path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    // Parse JSON
+    let o: Value = serde_json::from_str(&contents)?;
+    let token = o["access_token"].as_str().expect("Failed to get token.");
+    
+    // Prepare HTTP Query
+    let client = reqwest::Client::new();
+    let request = client.get("https://owner-api.teslamotors.com/api/1/products")
+            .header("User-Agent", "curl/7.64.1")
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Accept", "*/*")
+    ;
+
+    // Send query...
+    let reponse = request.send().await?;
+
+    // Display verbose informations...
+    if matches.is_present("debug") {
+        println!("{:#?}", &reponse);
+    }
+    
+    // Parse JSON response...
+    let text = &reponse.text().await?;
+    let v: Value = serde_json::from_str(&text).expect("Failed to parse result from API.");
+    let result = &v["response"].as_array();
+
+    print!("ID\t\t\tVIN\t\t\tState\t\tName\n");
+    for item in result.unwrap() {
+        println!("{}\t{}\t{}\t\t{}\n", 
+            item["id"], 
+            item["vin"].as_str().unwrap_or("-"),
+            item["state"].as_str().unwrap_or("-"),
+            item["display_name"].as_str().unwrap_or("Untitled")
+        );
+    }
+
+    println!("");
+    Ok(())
 }
 
 /**

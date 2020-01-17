@@ -27,14 +27,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .help("Username")
                         )
                     )
-                    .subcommand(SubCommand::with_name("vehicles")
-                        .about("List vehicles")
+                    .subcommand(SubCommand::with_name("products")
+                        .about("List products")
                     )
                     .setting(AppSettings::ArgRequiredElseHelp)
                     .get_matches();
 
     match matches.subcommand() {
         ("login", Some(cmd_matches)) => command::login(cmd_matches, &matches),
+        ("products", Some(_)) => command::products(&matches),
         _ => command::not_found(),
     }
 }
